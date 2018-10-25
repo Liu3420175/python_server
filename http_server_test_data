@@ -1,0 +1,34 @@
+http.server 模块解读
+### BaseHTTPRequestHandler object __dict__
+{'connection': <socket.socket fd=4, family=AddressFamily.AF_INET, type=SocketKind.SOCK_STREAM,
+proto=0, laddr=('192.168.59.131', 8080), raddr=('192.168.59.1', 5629)>,
+'request_version': 'HTTP/1.1', 'wfile': <socket.SocketIO object at 0x7f05c89f45f8>,
+ 'requestline': 'GET /cms/v1/aftersale/enregister/list HTTP/1.1',
+ 'raw_requestline': b'GET /cms/v1/aftersale/enregister/list HTTP/1.1\r\n',
+ 'path': '/cms/v1/aftersale/enregister/list', 'close_connection': True,
+ 'rfile': <_io.BufferedReader name=4>,
+ 'headers': <http.client.HTTPMessage object at 0x7f05c89fcf60>,
+ 'server': <http.server.HTTPServer object at 0x7f05cb4c0550>,
+ 'client_address': ('192.168.59.1', 5629),
+ 'request': <socket.socket fd=4, family=AddressFamily.AF_INET,
+ type=SocketKind.SOCK_STREAM, proto=0, laddr=('192.168.59.131', 8080),
+  raddr=('192.168.59.1', 5629)>,
+   'command': 'GET'}
+
+查看源代码就知道connection和request是同一个对象，id相同,是socket.socket对象，
+因为它用来__slot__,所以它没有__dict__属性,这是一个更偏底层的网络编程的套接字对象,可参考官方文档
+https://yiyibooks.cn/xx/python_352/library/socket.html,套接字编程可参考Unix网络编程书籍
+
+server 值是 http.server.HTTPServer 对象,改对象里有个属性socket也是socket.socket对象，
+但是与connetion的id不同,两者有啥区别呢?又各有什么用处呢?????TCP和UDP都是全双工
+
+rfile包含一个输入流，位于可选输入数据的开头。返回值是二进制文本缓冲流,看源码她们是从socket上获取的
+self.rfile = self.connection.makefile('rb', self.rbufsize)
+self.wfile = self.connection.makefile('wb', self.wbufsize)
+发送端必须指定content-length.若不指定，程序就会卡在rfile.read()上，不知道读取多少
+https://yiyibooks.cn/xx/python_352/library/io.html
+wfile包含用于将响应写回客户端的输出流。在写入此流时，必须正确遵守HTTP协议。
+https://blog.csdn.net/xhw88398569/article/details/49179967
+
+
+
