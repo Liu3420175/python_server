@@ -4,6 +4,7 @@ import time
 from threading import Thread
 from queue import Queue,Empty
 from multiprocessing import Process,Pool,Pipe
+from concurrent.futures import ThreadPoolExecutor
 
 urls = [
     "https://yiyibooks.cn/xx/python_352/library/index.html",
