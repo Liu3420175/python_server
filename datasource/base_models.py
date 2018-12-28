@@ -4,22 +4,9 @@
 # datetime:18-12-24 上午9:32
 # software: PyCharm
 
-def TransformList2Object(obj, propName,classType,istolist=False):
-    """
-        讲原始数据转换成基础对象
-    """
-    properties = getattr(obj,propName,None)
-    if not (isinstance(properties, list) or isinstance(properties, set) or isinstance(properties, dict)):
-        return None
-
-    if istolist:
-        tmpList = [classType(**p) for p in properties if isinstance(p,dict)]
-        setattr(obj,propName,tmpList)
-    else:
-        setattr(obj,propName,classType(**properties))
-
 
 class QueryBaseModel(object):
+    __slots__ = ()
 
     def __init__(self):
        pass
@@ -28,19 +15,34 @@ class QueryBaseModel(object):
         """
         检查初始化的参数是否合法，只适合是None 或者字符串情况
         """
+
         for one in args:
             if one is  None  or (isinstance(one,str) and len(one) > 0):
                 pass
             else:
-                raise  Exception() # TODO 异常
+                #pass
+                raise  Exception("必须为非空字符串或者None")
+
+    def TransformList2Object(self, propName, classType, istolist=False):
+        """
+            讲原始数据转换成基础对象
+        """
+        properties = getattr(self, propName, None)
+        if not (isinstance(properties, list) or isinstance(properties, set) or isinstance(properties, dict)):
+            return None
+
+        if istolist:
+            tmpList = [classType(**p) for p in properties if isinstance(p, dict)]
+            setattr(self, propName, tmpList)
+        else:
+            setattr(self, propName, classType(**properties))
 
 
 class Property(QueryBaseModel):
     """
-    属性，查询对象的熟悉
+    属性，查询对象的属性，不考虑case_when和嵌套情况
     """
-    __slots__ = ("query_name","prop_name","alias","func","specifier","operator",
-                 "value","case_when","props")
+    __slots__ = ("query_name","prop_name","alias","func","specifier","operator","value","props","case_when")
 
     def __init__(self,
                  query_name=None,
@@ -50,8 +52,8 @@ class Property(QueryBaseModel):
                  specifier=None,
                  value=None,
                  operator=None,
-                 case_when=None,
-                 props=None
+                 props=None,
+                 case_when=None
                  ):
         """
         Args:
@@ -62,11 +64,10 @@ class Property(QueryBaseModel):
             specifier: 修饰符
             value: 具体的值,属性可能不是表的属性，只是表示一个值而已
             operator: 算术操作符
-            case_when:case_when条件,列表
             props:组合属性
         """
 
-        self._check_parameter(query_name,prop_name, alias, func, specifier, operator)
+        self._check_parameter(query_name,prop_name, alias, func, specifier)
         self.query_name = query_name
         self.prop_name = prop_name
         self.alias = alias
@@ -74,69 +75,46 @@ class Property(QueryBaseModel):
         self.value = value
         self.specifier = specifier
         self.operator = operator
-        self.case_when = case_when
         self.props = [] if props is None else props
+        self.case_when = case_when
         self._init()
         super(Property, self).__init__()
 
 
-    def __chech_func_args(self,query_name,prop_name,func_args):
-        """
-        检验初始化的func_args参数的合法性
-        """
-        if func_args is None or func_args == "":
-            _func_args = [".".join([query_name,prop_name]),]
-        else:
-            if isinstance(func_args,list) or isinstance(func_args,set) or isinstance(func_args,tuple):
-                _func_args = func_args
-            else:
-                raise Exception() # TODO 异常
-        return _func_args
+    def __str__(self):
+        return "Property(query_name=%s,propname=%s,value=%s)"%(
+            self.query_name if self.query_name else "",
+            self.prop_name if self.prop_name else "",
+            self.value)
 
     def _init(self):
-        TransformList2Object(self,"props",Property,True)
-        TransformList2Object(self,"case_when",CaseObject,True)
-
-    def __str__(self):
-        return "Property Object(query_name=%s,propname=%s)"%(self.query_name if self.query_name else "",
-                                                             self.prop_name if self.prop_name else "")
+        self.TransformList2Object( "props", Property, True)
+        self.TransformList2Object( "case_when", CaseObject, True)
 
 
 class QueryObject(QueryBaseModel):
     """
-    查询对象
+    查询对象,不考虑表连接情况
     """
-    __slots__ = ("name","alias","join_type","join_condition")
+    __slots__ = ("name","alias")
 
     def __init__(self,
                  name,
-                 alias,
-                 join_type=None,
-                 join_conditions=None):
+                 alias=None):
         """
          Args:
              name:查询对象名字
              alias:查询对象别名
-             join_type:连接方式
-             join_condition:连接条件,Condition对象
         """
-        self._check_parameter(alias,join_type)
-        assert isinstance(name, str) and len(name) > 0, "查询对象名必须是字符串且长度大于0"
+        #self._check_parameter(alias)
+        #assert isinstance(name, str) and len(name) > 0, "查询对象名必须是字符串且长度大于0"
         self.name = name
         self.alias = alias
-        self.join_type = join_type
-        self.join_condition = join_conditions
-        self._init()
         super(QueryObject,self).__init__()
 
-    def _init(self):
-        TransformList2Object(self,"join_condition",Condition,True)
 
     def __str__(self):
-        return "QueryObject Object(name=%s,alias=%s,join_type=%s,join_condition=%s)"%(self.name,
-                                                                                      self.alias,
-                                                                                      self.join_type if self.join_type else "",
-                                                                                      self.join_condition)
+        return "QueryObject(name=%s,alias=%s)"%(self.name,self.alias)
 
 
 class Condition(QueryBaseModel):
@@ -169,19 +147,22 @@ class Condition(QueryBaseModel):
 
 
     def _init(self):
-        TransformList2Object(self,"left",Property,False)
-        TransformList2Object(self,"right",Property,False)
-        TransformList2Object(self,"conditions",Condition,True)
+
+        self.TransformList2Object("left",Property,False)
+        self.TransformList2Object( "right", Property, False)
+        self.TransformList2Object("conditions",Condition,True)
 
     def __str__(self):
-        return "Condition Object(left=%s,right=%s,operator='%s')"%(self.left,self.right,self.operator)
+        return "Condition(left=%s,right=%s,operator='%s')"%(self.left,self.right,self.operator)
+
+
 
 
 class CaseObject(QueryBaseModel):
     """
-    case-when-then
+    case-when-then,预留
     """
-    __slots__ = ["condition","display"]
+    __slots__ = ("condition","display")
     def __init__(self,condition=None,display=""):
         """
         Args:
@@ -194,7 +175,11 @@ class CaseObject(QueryBaseModel):
         super(CaseObject,self).__init__()
 
     def _init(self):
-        TransformList2Object(self,"condition",Condition,False)
+        #TransformList2Object(self,"condition",Condition,False)
+        self.TransformList2Object( "condition", Condition, False)
+
+    def __str__(self):
+        return "CaseObject(condition=%s,display=%s)"%(self.condition,self.display)
 
 
 
@@ -202,7 +187,7 @@ class OrderBy(QueryBaseModel):
     """
     排序方式
     """
-    __slots__ = ["query_name","prop_name","method"]
+    __slots__ = ("query_name","prop_name","method")
 
     def __init__(self,
                  query_name,
@@ -222,11 +207,15 @@ class OrderBy(QueryBaseModel):
             if method in ("AES","DESC"):
                 self.method = method
             else:
-                raise Exception()
+                raise Exception("SQL排序关键字不合法")
         else:
-            raise Exception()
+            raise Exception("OrderBy.method必须是非空字符串")
 
         super(OrderBy,self).__init__()
+
+
+    def __str__(self):
+        return "OrderBy(query_name=%s,prop_name=%s,method=%s)"%(self.query_name,self.prop_name,self.method)
 
 
 
@@ -234,17 +223,16 @@ class LimitOffset(QueryBaseModel):
     """
     分页
     """
-    __slots__ = ["offset","row"]
+    __slots__ = ("offset","row")
     def __init__(self,offset=0,row=10):
         """
         Args:
             offset:偏移行数
             row:返回行数
         """
-        #assert isinstance(offset,int) and isinstance(row,int) and offset >= 0 and row >= 0
         self.offset = offset
         self.row = row
         super(LimitOffset,self).__init__()
 
     def __str__(self):
-        return "LimitOffset Object:(offset=%s,row=%s)"%(self.offset,self.row)
+        return "LimitOffset(offset=%s,row=%s)"%(self.offset,self.row)

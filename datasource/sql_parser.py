@@ -20,7 +20,6 @@ class SQLDataQueryParser(object):
     def parser(self):
         """
 
-        :return:
         """
         select = self.parserSelect()
         if not select:
@@ -56,12 +55,13 @@ class SQLDataQueryParser(object):
         解析Select部分
         """
         selects = self.querystucture.select
+
+
         if not selects:
             # TODO 是报异常好呢还是用*代替
             raise Exception("Select 部分缺失")
         res = [self.parserColumnContent(prop) for prop in selects]
         return ",".join(res)
-
 
 
     def parserTable(self):
@@ -83,6 +83,7 @@ class SQLDataQueryParser(object):
         wheres = self.querystucture.where
         res = ["1"]
         if wheres:
+            wheres[0].logical_relation = None
             res = [self.parserConditionContent(cond) for cond in wheres]
         return "".join(res)
 
@@ -126,6 +127,7 @@ class SQLDataQueryParser(object):
         havings = self.querystucture.having
         res = []
         if havings:
+            havings[0].logical_relation = None
             res = [self.parserConditionContent(cond) for cond in havings]
         return "".join(res)
 
@@ -138,45 +140,58 @@ class SQLDataQueryParser(object):
         if not isinstance(prop,Property):
             raise Exception("必须是Property类型") # TODO 有待改进，需要考虑None的情况
         str_list = []
+        if prop.operator:
+            str_list.append(" {0} ".format(prop.operator))
+
         if prop.func:
             str_list.append("{0}".format(prop.func))
 
         if prop.specifier:
             str_list.append("{0} ".format(prop.specifier))
 
-        if prop.props:
-            str_list.append("(")
-            for p in prop.props:
-                str_list.append(self.parserColumnContent(p))
-            str_list.append(")")
 
-
-        if prop.case_when and isinstance(prop.case_when,list):
-            l = len(prop.case_when)
-            str_list.append(" CASE {0} {1} END".format(
-                " ".join([self.parserCaseWhenContent(case) for case in prop.case_when[l - 1]]),
-                   self.parserCaseWhenContent(prop.case_when[-1]))
-            )
-
-
-        if prop.prop_name:
+        if prop.prop_name and not prop.case_when:
             if prop.query_name:
-                str_list.append("{0}.{1}".format(prop.query_name,prop.prop_name))
+                str_list.append("{0}{1}.{2}{3}".format("(" if prop.func else "",
+                                                       prop.query_name,
+                                                       prop.prop_name,
+                                                       ")" if prop.func else ""))
 
-            if prop.operator and prop.value:
-                str_list.append(" {0} {1}".format(prop.operator,prop.value))
-
-        elif  not prop.func and not prop.props:
+        if not prop.prop_name and not prop.case_when and not prop.func:
             # 将Property当作值，没有表表名和字段名
+
             if prop.value is None:
                 str_list.append(" NULL")
-            elif isinstance(prop.value,Iterable):
-                str_list.append("({0})".format(",".join(prop.value)))
+            elif isinstance(prop.value,list) or isinstance(prop.value,tuple):
+                if len(prop.value) == 0:
+                    str_list.append("")
+                elif len(prop.value) == 1:
+                    str_list.append("{0}".format(prop.value[0]))
+                else:
+                    str_list.append("({0})".format(",".join(prop.value)))
+            else:
+                str_list.append(prop.value)
+
+        if prop.case_when and isinstance(prop.case_when, list):
+            l = len(prop.case_when)
+            str_list.append(" (CASE {0} {1} END)".format(
+                " ".join([self.parserCaseWhenContent(case) for case in prop.case_when[0:l - 1]]),
+                self.parserCaseWhenContent(prop.case_when[-1]))
+            )
+
+        if prop.props:
+
+            #str_list.append("(")
+            for p in prop.props:
+                str_list.append(self.parserColumnContent(p))
+            #str_list.append(")")
 
         if prop.alias:
             str_list.append(" AS {0} ".format(prop.alias))
 
         return "".join(str_list)
+
+
 
 
     def parserCaseWhenContent(self,case):
@@ -193,6 +208,7 @@ class SQLDataQueryParser(object):
         else:
             expression = self.parserConditionContent(case.condition)
             str_list.append(" WHEN {0} THEN {1}".format(expression,case.display))
+
         return "".join(str_list)
 
 
@@ -228,22 +244,8 @@ class SQLDataQueryParser(object):
         """
         if not isinstance(query,QueryObject):
             raise Exception("必须是QueryObject对象")
-        str_list = []
-        if query.join_type:
-            str_list.append("{0} JOIN {1} {2}".format(
-                query.join_type,
-                query.name,
-                "AS %s"%query.alias if query.alias else ""
-            ))
 
-            if not query.join_condition:
-                raise Exception("连接条件缺失")
-
-            str_list.append(" ON {0}".format("".join([self.parserConditionContent(cond) for cond in query.join_condition if cond])))
-        else:
-            #没有外连接关系
-            str_list.append("{0} {1}".format(query.name,"AS %s"%query.alias if query.alias else ""))
-        return "".join(str_list)
+        return ("{0} {1}".format(query.name,"AS %s"%query.alias if query.alias else ""))
 
 
     def parserOrderByContent(self,order_by):
@@ -254,7 +256,7 @@ class SQLDataQueryParser(object):
             raise Exception("必须是OrderBy对象")
         str_list = []
         if order_by.query_name and order_by.prop_name:
-            str_list.append("`{0}`.`{1}` {2}".format(order_by.query_name,order_by.prop_name,order_by.method))
+            str_list.append("{0}.{1} {2}".format(order_by.query_name,order_by.prop_name,order_by.method))
         return "".join(str_list)
 
 

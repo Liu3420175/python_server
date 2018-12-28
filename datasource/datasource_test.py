@@ -5,9 +5,11 @@
 # software: PyCharm
 
 from datasource.sql_parser import SQLDataQueryParser
-#from datasource.base_models import LimitOffset,Condition,QueryObject
+from datasource.base_models import LimitOffset,Property
 from datasource.querystructure import QueryStructre
+from datasource.parse_json import BaseStringToStruct,StringToStruct,JsonParse
 
+import json
 
 if __name__ == "__main__":
     data = {
@@ -44,17 +46,36 @@ if __name__ == "__main__":
      "page": 1,
      "limit": 10
     }
-    select = [{
+    select = [
+        {
         "query_name":"user",
         "prop_name":"id"
     },{"query_name":"user",
        "prop_name":"name"},
         {"query_name": "user",
-         "prop_name": "email"},
+         "prop_name": "email",
+         "operator":"+",
+         "props":[{
+             "query_name": "user",
+             "prop_name": "id"
+        }],
+         },
+        {"value":"10"},
+        {"case_when":[
+            {"condition":{
+                "left":{"query_name":"xxx","prop_name":"pv"},
+                "right":{"value":"1000"},
+                "operator":"<="
+            },"display":"好的"
+            },{
+                "condition": None, "display": "其它"
+            }
+        ]}
     ]
     limit = {"offset":(data.get("page",1) - 1) * data.get("limit",10),
              "row":data.get("limit",10)}
-    #Limit_object = LimitOffset(**limit)
+    Limit_object = LimitOffset(**limit)
+
     data_filter = data.get("filter",{})
     relation = data_filter.get("relation")
     conds = data_filter.get("conditions",[])
@@ -68,16 +89,45 @@ if __name__ == "__main__":
 
     #c = Condition(**conditions[0])
 
-    table = [{"name":"user_table","alias":"user","join_type":None},
-             {"name": "order_table", "alias": "order", "join_type": "INDER",
-              "join_conditions":[{"left":{"query_name":"user",
-                           "prop_name":"id"},
-                   "right":{"query_name":"order","prop_name":"user_id"},
-                   "operator":"=",
-                   "logical_relation":None}]}
+    table = [{"name":"user_table","alias":"user",},
+
              ]
+    #se = Property(**select[-1])
     #t = QueryObject(**table[-1])
-    query_struct = QueryStructre(select=select,query_object=table,where=conditions,limit=limit)
-    sql = SQLDataQueryParser(query_struct,data)
+    #query_struct = QueryStructre(select=select,query_object=table,where=conditions,limit=limit)
+    #sql = SQLDataQueryParser(query_struct,data)
     #print(query_struct.query_object[1])
-    print(sql.parser())
+    #s = BaseStringToStruct("计算方式(可选)@字段名$in(1,2,3,4)","table")
+    #s = BaseStringToStruct("字段名$lt(范围)","table")
+    #s = BaseStringToStruct("字段名$desc", "table")
+    #s = BaseStringToStruct("100", "table")
+    #s = StringToStruct("别名(可选):计算方式(可选)@字段名$eq(100)#+#计算方式(可选)@字段名$gt(1000)","user")
+    #s = StringToStruct("别名(可选):字段名", "user")
+    #s = StringToStruct("字段名", "user")
+    #print(sql.parser())
+
+    json_data = """
+    {
+    "analysis_model":"page_view",
+    "product_code":"xxxx",
+    "app_code":"",
+    "tenant_code":"",
+    "from_date": "2018-12-20",
+    "to_date": "2018-12-20",
+    "date_unit":"hour",
+    "dim_fields": ["product", "os_name"],
+    "num_fields":["product",
+        "app",
+        "pv:COUNT@app",
+        "div_10:response_time#/#10",
+        "Over_1800_Rate:SUM@response_time$lt(1800)#/#COUNT@response_time"
+        ],
+    "filter": ["app$in(fast,yunlian)","browser_name$eq(chrome)","os_name$rlike(Windowns)","title$like(标题)"],
+	"order_by": ["product$desc"],
+     "page": 2,
+	 "page_size":10
+}
+"""
+
+    j = JsonParse(json_data)
+    print(j.sql())
