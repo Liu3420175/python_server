@@ -1,36 +1,19 @@
 
 #https://yiyibooks.cn/xx/python_352/library/http.server.html
 #https://yiyibooks.cn/xx/python_352/library/socketserver.html#socketserver.TCPServer
+
 from http.server import HTTPServer,BaseHTTPRequestHandler,SimpleHTTPRequestHandler
 
 from http.client import HTTPResponse
+import mimetypes
 import os
 
-MEDIA_ROOT = "/home/docker"
+MEDIA_ROOT = "/home/liulonghua/service"
+
 
 class HttpRequest(object):
     pass
 
-def parse_mime(path):
-    _,ext = os.path.splitext(path)
-    if ext == ".ico":
-        mime = "image/x-icon"
-    elif ext == ".ief":
-        mime = "image/ief"
-    elif ext == ".jfif":
-        mime = "image/jpeg"
-    elif ext == ".jpe" or ext == ".jpeg" or ext == ".jpg":
-        mime = "image/jpeg"
-    elif ext == ".mp4":
-        mime = "audio/mp4"
-    elif ext == ".mp3":
-        mime = "audio/mp3"
-    elif ext == ".pdf":
-        mime = "application/octet-stream"
-    elif ext == ".js":
-        mime = "application/ecmascript"
-    else:
-        mime = "application/octet-stream"
 
 class Handler(BaseHTTPRequestHandler):
     """def handle(self):
@@ -41,28 +24,41 @@ class Handler(BaseHTTPRequestHandler):
         #简单的静态服务器
         path = self.path
         self.send_response(200)
-        mime = parse_mime(path)
+        mime = mimetypes.read_mime_types(path)
         self.send_header("Content-type", mime)
         self.end_headers()
 
-
         dir_path = os.path.join(MEDIA_ROOT,path.strip("/"))
-        try:
-            with open(dir_path,"rb") as f:
+        if os.path.isdir(dir_path):
+            html = '<!doctype html>' \
+                   '<html lang="en">' \
+                   '<head>' \
+                   '</head>' \
+                   '<body>' \
+                   '<a>%(dir_path)s</a>' \
+                   '%(detail)s' \
+                   '</body>' \
+                   '</html>'
+            file_list = os.listdir(dir_path)
+            p = ['<a href="%s"> %s</a>  <br>'%(path + '/' + one, one) for one in file_list]
+            print('===',path)
+            p = ''.join(p)
+            html = html%{'dir_path': dir_path, 'detail': p}
+            self.wfile.write(html.encode('utf-8'))
+        else:
+            try:
+                with open(dir_path, "rb") as f:
 
-                self.wfile.write(f.read())
-        except:
-            with open("404.html","rb") as f:
+                    self.wfile.write(f.read())
+            except:
+                with open("404.html","rb") as f:
 
-                self.wfile.write(f.read())
-
+                    self.wfile.write(f.read())
 
     def do_POST(self):
         l = self.headers.get("content-length")
 
         print(self.rfile.read(int(l)))
-
-
 
 
 if __name__ == "__main__":
